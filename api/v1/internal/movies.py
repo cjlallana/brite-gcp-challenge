@@ -4,7 +4,7 @@ from fastapi import HTTPException
 
 from api import app
 from core.firestore_config import db
-from services.movies import populate_database
+from services.movies import MovieService
 
 # OMDB API Configuration
 OMDB_API_KEY = os.getenv("OMDB_API_KEY", "83a26ab")
@@ -14,7 +14,7 @@ OMDB_URL = "http://www.omdbapi.com/"
 # Fetch 100 movies from OMDB and save them to Firestore
 @app.get("/initialize")
 async def initialize_database():
-    info = await populate_database()
+    info = await MovieService().populate_database()
     return {"message": f"Database initialized with {len(info)} movies."}
 
 
