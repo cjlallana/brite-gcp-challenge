@@ -1,14 +1,25 @@
 import os
 
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from api import app
 from core.firestore_config import db
 from services.movies import MovieService
 
+# Authorization token (can be replaced with a more secure method)
+SECRET_TOKEN = os.getenv("SECRET_TOKEN", "my_secret_token")
+security = HTTPBearer()
+
 # OMDB API Configuration
 OMDB_API_KEY = os.getenv("OMDB_API_KEY", "83a26ab")
 OMDB_URL = "http://www.omdbapi.com/"
+
+
+# Utility function to validate authorization token
+def authorize(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if credentials.credentials != SECRET_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
 
 
 # Fetch 100 movies from OMDB and save them to Firestore
@@ -16,6 +27,15 @@ OMDB_URL = "http://www.omdbapi.com/"
 async def initialize_database():
     info = await MovieService().populate_database()
     return {"message": f"Database initialized with {len(info)} movies."}
+
+
+# Remove a movie by ID (protected)
+@router.delete("/movies/{movie_id}")
+async def delete_movie(
+    movie_id: str, credentials: HTTPAuthorizationCredentials = Depends(authorize)
+):
+    await MovieService().delete_movie(movie_id)
+    return {"message": "Movie deleted successfully"}
 
 
 # Add a new movie to Firestore by fetching details from OMDB
