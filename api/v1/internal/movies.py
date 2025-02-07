@@ -39,8 +39,8 @@ async def initialize_database(
 async def add_movie(
     title: str, credentials: HTTPAuthorizationCredentials = Depends(authorize)
 ):
-    await MovieService().add_movie(title)
-    return {"message": "Movie added successfully"}
+    info = await MovieService().add_movie(title)
+    return {"message": info}
 
 
 # Remove a movie by ID
