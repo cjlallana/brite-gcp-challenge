@@ -5,11 +5,18 @@ from services.movies import MovieService
 svc = MovieService()
 
 
-async def test_retrieve_movies_from_omdb():
-    movies = await svc.retrieve_movies_from_omdb()
+async def test_retrieve_100_movies_from_omdb():
+    movies = await svc.retrieve_100_movies_from_omdb()
     assert movies
     assert len(movies) == 100
     assert movies[1].title
+
+
+async def test_retrieve_movie_from_omdb():
+    movie = await svc.retrieve_movie_from_omdb("las vegas")
+    assert movie
+    assert movie.title == "Las Vegas"
+    assert movie.title_lower == "las vegas"
 
 
 async def test_populate_database():
@@ -57,3 +64,13 @@ async def test_get_movie_by_title():
     movie = await svc.get_movie_by_title("Sobre las olas")
     assert movie
     assert movie.title == "Sobre las olas"
+
+
+async def test_add_movie_already_exists_in_firestore():
+    info = await svc.add_movie("las vegas")
+    assert info
+
+
+async def test_add_movie_not_exists_in_firestore():
+    info = await svc.add_movie("el zorro")
+    assert info
