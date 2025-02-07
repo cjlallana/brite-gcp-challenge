@@ -20,6 +20,7 @@ async def get_movies(limit: int = 10, page: int = 1):
 # Get a single movie by ID
 @router.get("/{movie_id}")
 async def get_movie(movie_id: str):
+    logging.info(f"Fetching movie with ID {movie_id}")
     return await MovieService().get_movie_by_id(movie_id)
 
 
