@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 import requests
 from fastapi import HTTPException
@@ -42,6 +43,7 @@ class MovieService:
                 )
 
         movies = [MovieDB.model_validate(movie) for movie in movies_dict]
+
         return movies
 
     async def retrieve_movie_from_omdb(self, title: str) -> MovieDB:
@@ -60,7 +62,10 @@ class MovieService:
         if response.status_code == 200:
             data = response.json()
             if data.get("Response") == "True":
-                return MovieDB.model_validate(data)
+                movie = MovieDB.model_validate(data)
+                movie.full_details = True
+                return movie
+
             raise HTTPException(status_code=404, detail="Movie not found in OMDB")
         raise HTTPException(status_code=500, detail="Failed to fetch movie from OMDB")
 
@@ -94,20 +99,22 @@ class MovieService:
             raise HTTPException(status_code=404, detail="Movie not found")
         return MovieAPI.model_validate(movie.to_dict())
 
-    async def _list_movies_by_title(self, title: str) -> list[MovieAPI]:
+    async def _get_movie_by_title(self, title: str) -> Optional[MovieDB]:
         movies_ref = db.collection(MOVIES_COLLECTION)
         query = movies_ref.where("title_lower", "==", title.lower())
-        movies = query.stream()
+        movie_generator = query.stream()
 
-        return [MovieAPI.model_validate(movie.to_dict()) for movie in movies]
+        movies = [movie.to_dict() for movie in movie_generator]
+
+        # We're supposed to retrieve only one movie
+        return MovieDB.model_validate(movies[0]) if movies else None
 
     async def get_movie_by_title(self, title: str) -> MovieAPI:
-        movies_api = await self._list_movies_by_title(title)
-        if not movies_api:
-            raise HTTPException(status_code=404, detail="Movie not found")
+        movie = await self._get_movie_by_title(title)
+        if not movie:
+            raise HTTPException(status_code=404, detail="Movie not found in Firestore")
         else:
-            # We're supposed to retrieve only one movie
-            return movies_api[0]
+            return MovieAPI.model_validate(movie.model_dump())
 
     async def add_movie(self, title: str):
         # Fetch full movie details from OMDB
@@ -116,11 +123,14 @@ class MovieService:
         movie_ref = db.collection(MOVIES_COLLECTION)
 
         # Check if a movie with the same title already exists in Firestore
-        firestore_movies = await self._list_movies_by_title(omdb_movie.title)
-        if firestore_movies:
-            doc = movie_ref.document(firestore_movies[0].movie_id)
-            doc.update(omdb_movie.model_dump())
-            return {"message": "Movie updated successfully"}
+        firestore_movie = await self._get_movie_by_title(omdb_movie.title)
+        if firestore_movie:
+            # Check if the movie already has full details, so there's no need to update it
+            if not firestore_movie.full_details:
+                doc = movie_ref.document(firestore_movie.movie_id)
+                omdb_movie.movie_id = firestore_movie.movie_id
+                doc.update(omdb_movie.model_dump())
+                return {"message": "Movie updated successfully"}
         else:
             doc = movie_ref.document(omdb_movie.movie_id)
             doc.set(omdb_movie.model_dump())
