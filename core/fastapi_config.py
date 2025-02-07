@@ -2,7 +2,8 @@ import os
 
 from fastapi import FastAPI
 
-from api.v1.public import movies
+from api.v1.internal import movies as movies_internal
+from api.v1.public import movies as movies_public
 
 app = FastAPI(
     title="Public API",
@@ -10,7 +11,8 @@ app = FastAPI(
     debug=(os.getenv("LOGGING_LEVEL", "INFO") == "DEBUG"),
 )
 
-app.include_router(router=movies.router)
+app.include_router(router=movies_public.router)
+app.include_router(router=movies_internal.router)
 
 
 @app.get("/v1/healthy", include_in_schema=False)
