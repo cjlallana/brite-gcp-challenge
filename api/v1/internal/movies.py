@@ -3,7 +3,6 @@ import os
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from core.firestore_config import db
 from services.movies import MovieService
 
 router = APIRouter(
@@ -28,28 +27,26 @@ def authorize(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
 # Fetch 100 movies from OMDB and save them to Firestore
 @router.get("/initialize")
-async def initialize_database():
+async def initialize_database(
+    credentials: HTTPAuthorizationCredentials = Depends(authorize),
+):
     info = await MovieService().populate_database()
     return {"message": f"Database initialized with {len(info)} movies."}
 
 
-# Remove a movie by ID (protected)
+# Add a new movie to Firestore by fetching details from OMDB
+@router.post("/")
+async def add_movie(
+    title: str, credentials: HTTPAuthorizationCredentials = Depends(authorize)
+):
+    await MovieService().add_movie(title)
+    return {"message": "Movie added successfully"}
+
+
+# Remove a movie by ID
 @router.delete("/{movie_id}")
 async def delete_movie(
     movie_id: str, credentials: HTTPAuthorizationCredentials = Depends(authorize)
 ):
     await MovieService().delete_movie(movie_id)
     return {"message": "Movie deleted successfully"}
-
-
-# Add a new movie to Firestore by fetching details from OMDB
-@router.post("/")
-async def add_movie(title: str):
-    response = requests.get(OMDB_URL, params={"apikey": OMDB_API_KEY, "t": title})
-    if response.status_code == 200:
-        data = response.json()
-        if data.get("Response") == "True":
-            db.collection(MOVIES_COLLECTION).document(data["imdbID"]).set(data)
-            return {"message": "Movie added successfully"}
-        raise HTTPException(status_code=404, detail="Movie not found in OMDB")
-    raise HTTPException(status_code=500, detail="Failed to fetch movie from OMDB")

@@ -13,7 +13,9 @@ OMDB_URL = "http://www.omdbapi.com/"
 
 
 class MovieService:
-    async def retrieve_movies_from_omdb(self) -> list[MovieDB]:
+
+    # ---- OMDB API related methods ----
+    async def retrieve_100_movies_from_omdb(self) -> list[MovieDB]:
         """
         Retrieve 100 movies from OMDB API.
 
@@ -42,6 +44,28 @@ class MovieService:
         movies = [MovieDB.model_validate(movie) for movie in movies_dict]
         return movies
 
+    async def retrieve_movie_from_omdb(self, title: str) -> MovieDB:
+        """
+        Retrieve a movie from OMDB API by title.
+
+        :param title: The title of the movie to retrieve.
+        :return: A Movie object with the movie's data.
+        :raises HTTPException: If the movie is not found in OMDB or there is an error
+            while fetching the data.
+        """
+
+        response = requests.get(
+            OMDB_URL, params={"apikey": OMDB_API_KEY, "type": "movie", "t": title}
+        )
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("Response") == "True":
+                return MovieDB.model_validate(data)
+            raise HTTPException(status_code=404, detail="Movie not found in OMDB")
+        raise HTTPException(status_code=500, detail="Failed to fetch movie from OMDB")
+
+    # ---- Firestore related methods ----
+
     async def populate_database(self) -> list:
         # First, check that the database is not populated yet
         collection_ref = db.collection(MOVIES_COLLECTION)
@@ -50,7 +74,7 @@ class MovieService:
         if count_result[0][0].value > 0:
             raise HTTPException(status_code=400, detail="Database is already populated")
 
-        movies = await self.retrieve_movies_from_omdb()
+        movies = await self.retrieve_100_movies_from_omdb()
 
         batch = db.batch()
         for movie in movies:
@@ -70,15 +94,37 @@ class MovieService:
             raise HTTPException(status_code=404, detail="Movie not found")
         return MovieAPI.model_validate(movie.to_dict())
 
-    async def get_movie_by_title(self, title: str) -> MovieAPI:
-        movies_ref = db.collection(MOVIES_COLLECTION).where("title_lower", "==", title)
-        movies = movies_ref.stream()
+    async def _list_movies_by_title(self, title: str) -> list[MovieAPI]:
+        movies_ref = db.collection(MOVIES_COLLECTION)
+        query = movies_ref.where("title_lower", "==", title.lower())
+        movies = query.stream()
 
-        movies_api = [MovieAPI.model_validate(movie.to_dict()) for movie in movies]
+        return [MovieAPI.model_validate(movie.to_dict()) for movie in movies]
+
+    async def get_movie_by_title(self, title: str) -> MovieAPI:
+        movies_api = await self._list_movies_by_title(title)
         if not movies_api:
             raise HTTPException(status_code=404, detail="Movie not found")
         else:
+            # We're supposed to retrieve only one movie
             return movies_api[0]
+
+    async def add_movie(self, title: str):
+        # Fetch full movie details from OMDB
+        omdb_movie = await self.retrieve_movie_from_omdb(title)
+        # Prepare to update or create the movie in Firestore
+        movie_ref = db.collection(MOVIES_COLLECTION)
+
+        # Check if a movie with the same title already exists in Firestore
+        firestore_movies = await self._list_movies_by_title(omdb_movie.title)
+        if firestore_movies:
+            doc = movie_ref.document(firestore_movies[0].movie_id)
+            doc.update(omdb_movie.model_dump())
+            return {"message": "Movie updated successfully"}
+        else:
+            doc = movie_ref.document(omdb_movie.movie_id)
+            doc.set(omdb_movie.model_dump())
+            return {"message": "Movie added successfully"}
 
     async def delete_movie(self, movie_id: str):
         movie_ref = db.collection(MOVIES_COLLECTION).document(movie_id)
