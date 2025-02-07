@@ -1,16 +1,16 @@
 from typing import Any, Optional
 from uuid import uuid4
 
-from pydantic import UUID4, ConfigDict, Field, computed_field, model_validator
+from pydantic import ConfigDict, Field, computed_field, model_validator
 from pydantic.alias_generators import to_pascal
 
 from models.db import DBModel
 
 
 class Movie(DBModel):
-    movie_id: UUID4 = Field(alias="_id", default_factory=lambda: str(uuid4()))
-    title: Optional[str] = None
-    year: Optional[int] = None
+    movie_id: str = Field(alias="_id", default_factory=lambda: str(uuid4()))
+    title: str
+    year: int
     rated: Optional[str] = None
     released: Optional[str] = None
     runtime: Optional[str] = None
@@ -26,7 +26,7 @@ class Movie(DBModel):
     metascore: Optional[str] = None
     imdb_rating: Optional[str] = None
     imdb_votes: Optional[str] = None
-    imdb_id: Optional[str] = None
+    imdb_id: str
     type: Optional[str] = None
     dvd: Optional[str] = None
     box_office: Optional[str] = None
@@ -44,6 +44,7 @@ class Movie(DBModel):
         Returns:
             str: The title in lowercase
         """
+        assert self.title
         return self.title.lower()
 
     @model_validator(mode="before")
