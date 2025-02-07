@@ -1,16 +1,17 @@
 from typing import Any, Optional
 from uuid import uuid4
 
-from pydantic import ConfigDict, Field, computed_field, model_validator
-from pydantic.alias_generators import to_pascal
+from pydantic import Field, computed_field, model_validator
+from pydantic.alias_generators import to_snake
 
 from models.db import DBModel
 
 
 class Movie(DBModel):
-    movie_id: str = Field(alias="_id", default_factory=lambda: str(uuid4()))
+    movie_id: str = Field(default_factory=lambda: str(uuid4()))
     title: str
     year: int
+    imdb_id: str
     rated: Optional[str] = None
     released: Optional[str] = None
     runtime: Optional[str] = None
@@ -26,14 +27,15 @@ class Movie(DBModel):
     metascore: Optional[str] = None
     imdb_rating: Optional[str] = None
     imdb_votes: Optional[str] = None
-    imdb_id: str
     type: Optional[str] = None
     dvd: Optional[str] = None
     box_office: Optional[str] = None
     production: Optional[str] = None
     website: Optional[str] = None
 
-    model_config = ConfigDict(alias_generator=to_pascal, populate_by_name=True)
+    # When fetching multiple movies, OMDB returns a list of simplified
+    # results that do not contain full details.
+    full_details: Optional[bool] = False
 
     @computed_field
     @property
@@ -49,21 +51,18 @@ class Movie(DBModel):
 
     @model_validator(mode="before")
     @classmethod
-    def capitalize_fields(cls, data: Any) -> Any:
+    def omdb_to_snake_fields(cls, data: Any) -> Any:
         """
         As OMDB API returns some field names in PascalCase and others in camelCase,
-        this method capitalizes the first letter of each field so they are consistent.
-        There might be some specific fields that need a special treatment as well.
-        The method is intended to be used before data is parsed into the model.
+        this method converts everything to snake_case, to be consistent with Python.
 
         Args:
-            data (Any): Input data that should be a dictionary with field names as keys.
+            data (Any): Should be a dictionary with field names as keys.
 
         Returns:
-            Any: A new dictionary with consistent field names.
+            Any: A new dictionary with snake_case field names.
         """
         if isinstance(data, dict):
-            capitalized_data = {k[0].upper() + k[1:]: v for k, v in data.items()}
-            capitalized_data["imdb_id"] = data.get("imdbID")  # special treatment
+            snake_data = {to_snake(k): v for k, v in data.items()}
 
-        return capitalized_data
+        return snake_data
