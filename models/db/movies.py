@@ -1,7 +1,7 @@
 from typing import Any, Optional
 from uuid import uuid4
 
-from pydantic import UUID4, ConfigDict, Field, model_validator
+from pydantic import UUID4, ConfigDict, Field, computed_field, model_validator
 from pydantic.alias_generators import to_pascal
 
 from models.db import DBModel
@@ -34,6 +34,17 @@ class Movie(DBModel):
     website: Optional[str] = None
 
     model_config = ConfigDict(alias_generator=to_pascal, populate_by_name=True)
+
+    @computed_field
+    @property
+    def title_lower(self) -> str:
+        """We want to store the title in lowercase in the database for
+        case insensitive search.
+
+        Returns:
+            str: The title in lowercase
+        """
+        return self.title.lower()
 
     @model_validator(mode="before")
     @classmethod

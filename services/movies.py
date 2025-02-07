@@ -71,7 +71,7 @@ class MovieService:
         return MovieAPI.model_validate(movie.to_dict())
 
     async def get_movie_by_title(self, title: str) -> MovieAPI:
-        movies_ref = db.collection(MOVIES_COLLECTION).where("title", "==", title)
+        movies_ref = db.collection(MOVIES_COLLECTION).where("title_lower", "==", title)
         movies = movies_ref.stream()
 
         movies_api = [MovieAPI.model_validate(movie.to_dict()) for movie in movies]
