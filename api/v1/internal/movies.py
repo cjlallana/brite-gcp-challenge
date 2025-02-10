@@ -34,15 +34,6 @@ async def initialize_database(
     return {"message": f"Database initialized with {len(info)} movies."}
 
 
-# Add a new movie to Firestore by fetching details from OMDB
-@router.post("/")
-async def add_movie(
-    title: str, credentials: HTTPAuthorizationCredentials = Depends(authorize)
-):
-    info = await MovieService().add_movie(title)
-    return {"message": info}
-
-
 # Remove a movie by ID
 @router.delete("/{movie_id}")
 async def delete_movie(
