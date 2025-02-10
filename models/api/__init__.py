@@ -3,10 +3,9 @@ read-only and have limited fields, so we don't expose private or sensitive
 fields to the client.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class ApiBaseModel(BaseModel):
-    class Config:
-        populate_by_name = True
-        # we could add some json_encoders here
+    model_config = ConfigDict(populate_by_name=True)
+    # we could also add some json_encoders here
