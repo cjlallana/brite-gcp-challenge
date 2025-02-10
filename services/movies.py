@@ -5,8 +5,8 @@ import requests
 from fastapi import HTTPException
 
 from core.firestore_config import MOVIES_COLLECTION, db
-from models.api.movies import Movie as MovieAPI
-from models.db.movies import Movie as MovieDB
+from models.api.movies import MovieReq, MovieRes
+from models.db.movies import Movie
 
 # OMDB API Configuration
 OMDB_API_KEY = os.getenv("OMDB_API_KEY", "83a26ab")
@@ -16,7 +16,7 @@ OMDB_URL = "http://www.omdbapi.com/"
 class MovieService:
 
     # ---- OMDB API related methods ----
-    async def retrieve_100_movies_from_omdb(self) -> list[MovieDB]:
+    async def retrieve_100_movies_from_omdb(self) -> list[Movie]:
         """
         Retrieve 100 movies from OMDB API.
 
@@ -42,11 +42,11 @@ class MovieService:
                     status_code=500, detail="Failed to fetch data from OMDB"
                 )
 
-        movies = [MovieDB.model_validate(movie) for movie in movies_dict]
+        movies = [Movie.model_validate(movie) for movie in movies_dict]
 
         return movies
 
-    async def retrieve_movie_from_omdb(self, title: str) -> MovieDB:
+    async def retrieve_movie_from_omdb(self, title: str) -> Movie:
         """
         Retrieve a movie from OMDB API by title.
 
@@ -62,7 +62,7 @@ class MovieService:
         if response.status_code == 200:
             data = response.json()
             if data.get("Response") == "True":
-                movie = MovieDB.model_validate(data)
+                movie = Movie.model_validate(data)
                 movie.full_details = True
                 return movie
 
@@ -87,19 +87,19 @@ class MovieService:
             batch.set(doc_ref, movie.model_dump())
         return batch.commit()
 
-    async def get_movies_from_firestore(self, limit: int = 10, page: int = 1):
+    async def list_movies_from_firestore(self, limit: int = 10, page: int = 1):
         movies_ref = db.collection(MOVIES_COLLECTION).order_by("title")
         movies = movies_ref.offset((page - 1) * limit).limit(limit).stream()
 
-        return [MovieAPI.model_validate(movie.to_dict()) for movie in movies]
+        return [MovieRes.model_validate(movie.to_dict()) for movie in movies]
 
-    async def get_movie_by_id(self, movie_id: str) -> MovieAPI:
+    async def get_movie_by_id(self, movie_id: str) -> MovieRes:
         movie = db.collection(MOVIES_COLLECTION).document(movie_id).get()
         if not movie.exists:
             raise HTTPException(status_code=404, detail="Movie not found")
-        return MovieAPI.model_validate(movie.to_dict())
+        return MovieRes.model_validate(movie.to_dict())
 
-    async def _get_movie_by_title(self, title: str) -> Optional[MovieDB]:
+    async def _get_movie_by_title(self, title: str) -> Optional[Movie]:
         movies_ref = db.collection(MOVIES_COLLECTION)
         query = movies_ref.where("title_lower", "==", title.lower())
         movie_generator = query.stream()
@@ -107,18 +107,18 @@ class MovieService:
         movies = [movie.to_dict() for movie in movie_generator]
 
         # We're supposed to retrieve only one movie
-        return MovieDB.model_validate(movies[0]) if movies else None
+        return Movie.model_validate(movies[0]) if movies else None
 
-    async def get_movie_by_title(self, title: str) -> MovieAPI:
+    async def get_movie_by_title(self, title: str) -> MovieRes:
         movie = await self._get_movie_by_title(title)
         if not movie:
             raise HTTPException(status_code=404, detail="Movie not found in Firestore")
         else:
-            return MovieAPI.model_validate(movie.model_dump())
+            return MovieRes.model_validate(movie.model_dump())
 
-    async def add_movie(self, title: str) -> str:
+    async def add_movie(self, req: MovieReq) -> str:
         # Fetch full movie details from OMDB
-        omdb_movie = await self.retrieve_movie_from_omdb(title)
+        omdb_movie = await self.retrieve_movie_from_omdb(req.title)
         # Prepare to update or create the movie in Firestore
         movie_ref = db.collection(MOVIES_COLLECTION)
 

@@ -2,6 +2,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
+from models.api.movies import MovieReq
 from services.movies import MovieService
 
 router = APIRouter(
@@ -12,9 +13,9 @@ router = APIRouter(
 
 # List movies with pagination and sorting by title
 @router.get("/")
-async def get_movies(limit: int = 10, page: int = 1):
+async def list_movies(limit: int = 10, page: int = 1):
     logging.info(f"Fetching movies with limit {limit} and page {page}")
-    return await MovieService().get_movies_from_firestore(limit, page)
+    return await MovieService().list_movies_from_firestore(limit, page)
 
 
 # Get a single movie by ID
@@ -32,3 +33,10 @@ async def get_movie_by_title(title: str | None = None):
 
     logging.info(f"Fetching movie with title {title}")
     return await MovieService().get_movie_by_title(title)
+
+
+# Add a new movie to Firestore by fetching details from OMDB
+@router.post("/")
+async def add_movie(req: MovieReq):
+    info = await MovieService().add_movie(req)
+    return {"message": info}
