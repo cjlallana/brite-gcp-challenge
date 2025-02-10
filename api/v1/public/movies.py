@@ -38,5 +38,5 @@ async def get_movie_by_title(title: str | None = None):
 # Add a new movie to Firestore by fetching details from OMDB
 @router.post("/")
 async def add_movie(req: MovieReq):
-    info = await MovieService().add_movie(req)
-    return {"message": info}
+    info, status = await MovieService().add_movie(req)
+    return {"message": info, "status": status}

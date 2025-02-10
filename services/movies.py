@@ -118,7 +118,7 @@ class MovieService:
         else:
             return MovieRes.model_validate(movie.model_dump())
 
-    async def add_movie(self, req: MovieReq) -> str:
+    async def add_movie(self, req: MovieReq) -> tuple[str, int]:
         # Fetch full movie details from OMDB
         omdb_movie = await self.retrieve_movie_from_omdb(req.title)
 
@@ -130,13 +130,13 @@ class MovieService:
                 doc = movies_ref.document(firestore_movie.movie_id)
                 omdb_movie.movie_id = firestore_movie.movie_id
                 doc.update(omdb_movie.model_dump())
-                return "Movie updated successfully"
+                return "Movie updated successfully", 204
             else:
-                return "Movie already exists in Firestore"
+                return "Movie already exists in Firestore", 200
         else:
             doc = movies_ref.document(omdb_movie.movie_id)
             doc.set(omdb_movie.model_dump())
-            return "Movie added successfully"
+            return "Movie added successfully", 201
 
     async def delete_movie(self, movie_id: str):
         doc_ref = movies_ref.document(movie_id)
