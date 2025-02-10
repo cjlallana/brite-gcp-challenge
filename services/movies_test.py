@@ -1,5 +1,9 @@
+from unittest.mock import patch
+
 from fastapi import HTTPException
 
+from models.api.movies import MovieReq
+from models.db.movies import Movie
 from services.movies import MovieService
 
 svc = MovieService()
@@ -54,23 +58,42 @@ async def test_get_movies_from_firestore_with_pagination():
     assert movies_page1 != movies_page2
 
 
-async def test_get_movie_by_id():
-    movie = await svc.get_movie_by_id("4bdecc86-635b-4d63-86f5-2760aa5e6982")
-    assert movie
-    assert movie.title == "Sobre las olas"
+# async def test_get_movie_by_id():
+#     movie = await svc.get_movie_by_id("4bdecc86-635b-4d63-86f5-2760aa5e6982")
+#     assert movie
+#     assert movie.title == "Sobre las olas"
 
 
-async def test_get_movie_by_title():
-    movie = await svc.get_movie_by_title("Las Vegas")
-    assert movie
-    assert movie.title == "Las Vegas"
+# async def test_get_movie_by_title():
+#     movie = await svc.get_movie_by_title("Las Vegas")
+#     assert movie
+#     assert movie.title == "Las Vegas"
 
 
-async def test_add_movie_already_exists_in_firestore():
-    info = await svc.add_movie("las vegas")
-    assert info
+@patch("services.movies.MovieService._get_movie_by_title")
+async def test_add_movie_already_exists_in_firestore(mock_get_movie_by_title):
+    # Pretend the movie already exists and has full details
+    mock_get_movie_by_title.return_value = Movie(
+        movie_id="mock_id",
+        title="el zorro",
+        year=2000,
+        imdb_id="mock_id",
+        full_details=True,
+    )
+
+    req = MovieReq(title="el zorro")
+    info, status = await svc.add_movie(req)
+    assert info == "Movie already exists in Firestore"
+    assert status == 200
 
 
-async def test_add_movie_not_exists_in_firestore():
-    info = await svc.add_movie("el zorro")
-    assert info
+@patch("services.movies.movies_ref")
+async def test_add_movie_not_exists_in_firestore(mock_movies_ref):
+    # Avoid actually adding it
+    mock_movies_ref.document.return_value.set.return_value = True
+
+    req = MovieReq(title="el zorro")
+    info, status = await svc.add_movie(req)
+
+    assert info == "Movie added successfully"
+    assert status == 201

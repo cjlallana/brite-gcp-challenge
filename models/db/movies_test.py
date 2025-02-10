@@ -35,12 +35,10 @@ MOCK_OMDB_API_RESPONSE = {
 }
 
 MOCK_FIRESTORE_MOVIE = {
-    "id": "1",
+    "movie_id": "1234-abcd",
     "title": "The Matrix",
     "year": "1999",
-    "genre": "Action, Sci-Fi",
-    "director": "Lana Wachowski, Lilly Wachowski",
-    "plot": "A computer hacker learns about the true nature of reality.",
+    "imdb_id": "tt0133093",
 }
 
 
@@ -53,11 +51,11 @@ def test_movie_model():
 
 
 def test_api():
-    response = client.get("/v1/")
+    response = client.get("/status")
     assert response.status_code == 200
 
 
-@patch("api.v1.public.movies.movies_ref")
+@patch("services.movies.movies_ref")
 def test_api_get_movie_by_id(mock_movies_ref):
     mock_doc = MagicMock()
     mock_doc.exists = True
@@ -66,6 +64,6 @@ def test_api_get_movie_by_id(mock_movies_ref):
         mock_doc  # Ensure get() works
     )
 
-    response = client.get("/v1/movies/1")
+    response = client.get("/v1/movies/1234-abcd")
     assert response.status_code == 200
     assert response.json()["title"] == "The Matrix"
