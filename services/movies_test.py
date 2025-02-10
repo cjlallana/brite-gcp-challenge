@@ -30,23 +30,23 @@ async def test_populate_database():
 
 
 async def test_get_movies_from_firestore():
-    movies = await svc.get_movies_from_firestore()
+    movies = await svc.list_movies_from_firestore()
     assert movies
     assert len(movies) == 10
 
 
 async def test_get_movies_from_firestore_with_limit():
-    movies = await svc.get_movies_from_firestore(limit=20)
+    movies = await svc.list_movies_from_firestore(limit=20)
     assert movies
     assert len(movies) == 20
 
 
 async def test_get_movies_from_firestore_with_pagination():
-    movies_page1 = await svc.get_movies_from_firestore()
+    movies_page1 = await svc.list_movies_from_firestore()
     assert movies_page1
     assert len(movies_page1) == 10
 
-    movies_page2 = await svc.get_movies_from_firestore(page=2)
+    movies_page2 = await svc.list_movies_from_firestore(page=2)
     assert movies_page2
     assert len(movies_page2) == 10
 
@@ -61,9 +61,9 @@ async def test_get_movie_by_id():
 
 
 async def test_get_movie_by_title():
-    movie = await svc.get_movie_by_title("Sobre las olas")
+    movie = await svc.get_movie_by_title("Las Vegas")
     assert movie
-    assert movie.title == "Sobre las olas"
+    assert movie.title == "Las Vegas"
 
 
 async def test_add_movie_already_exists_in_firestore():
