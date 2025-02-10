@@ -4,7 +4,7 @@ from typing import Optional
 import requests
 from fastapi import HTTPException
 
-from core.firestore_config import MOVIES_COLLECTION, db
+from core.firestore_config import db, movies_ref
 from models.api.movies import MovieReq, MovieRes
 from models.db.movies import Movie
 
@@ -73,8 +73,7 @@ class MovieService:
 
     async def populate_database(self) -> list:
         # First, check that the database is not populated yet
-        collection_ref = db.collection(MOVIES_COLLECTION)
-        count_query = collection_ref.count()
+        count_query = movies_ref.count()
         count_result = count_query.get()
         if count_result[0][0].value > 0:
             raise HTTPException(status_code=400, detail="Database is already populated")
@@ -83,24 +82,27 @@ class MovieService:
 
         batch = db.batch()
         for movie in movies:
-            doc_ref = db.collection(MOVIES_COLLECTION).document(movie.movie_id)
+            doc_ref = movies_ref.document(movie.movie_id)
             batch.set(doc_ref, movie.model_dump())
         return batch.commit()
 
     async def list_movies_from_firestore(self, limit: int = 10, page: int = 1):
-        movies_ref = db.collection(MOVIES_COLLECTION).order_by("title")
-        movies = movies_ref.offset((page - 1) * limit).limit(limit).stream()
+        movies = (
+            movies_ref.order_by("title")
+            .offset((page - 1) * limit)
+            .limit(limit)
+            .stream()
+        )
 
         return [MovieRes.model_validate(movie.to_dict()) for movie in movies]
 
     async def get_movie_by_id(self, movie_id: str) -> MovieRes:
-        movie = db.collection(MOVIES_COLLECTION).document(movie_id).get()
+        movie = movies_ref.document(movie_id).get()
         if not movie.exists:
             raise HTTPException(status_code=404, detail="Movie not found")
         return MovieRes.model_validate(movie.to_dict())
 
     async def _get_movie_by_title(self, title: str) -> Optional[Movie]:
-        movies_ref = db.collection(MOVIES_COLLECTION)
         query = movies_ref.where("title_lower", "==", title.lower())
         movie_generator = query.stream()
 
@@ -119,27 +121,25 @@ class MovieService:
     async def add_movie(self, req: MovieReq) -> str:
         # Fetch full movie details from OMDB
         omdb_movie = await self.retrieve_movie_from_omdb(req.title)
-        # Prepare to update or create the movie in Firestore
-        movie_ref = db.collection(MOVIES_COLLECTION)
 
         # Check if a movie with the same title already exists in Firestore
         firestore_movie = await self._get_movie_by_title(omdb_movie.title)
         if firestore_movie:
             # Check if the movie already has full details, so there's no need to update it
             if not firestore_movie.full_details:
-                doc = movie_ref.document(firestore_movie.movie_id)
+                doc = movies_ref.document(firestore_movie.movie_id)
                 omdb_movie.movie_id = firestore_movie.movie_id
                 doc.update(omdb_movie.model_dump())
                 return "Movie updated successfully"
             else:
                 return "Movie already exists in Firestore"
         else:
-            doc = movie_ref.document(omdb_movie.movie_id)
+            doc = movies_ref.document(omdb_movie.movie_id)
             doc.set(omdb_movie.model_dump())
             return "Movie added successfully"
 
     async def delete_movie(self, movie_id: str):
-        movie_ref = db.collection(MOVIES_COLLECTION).document(movie_id)
-        if not movie_ref.get().exists:
+        doc_ref = movies_ref.document(movie_id)
+        if not doc_ref.get().exists:
             raise HTTPException(status_code=404, detail="Movie not found")
-        movie_ref.delete()
+        doc_ref.delete()
