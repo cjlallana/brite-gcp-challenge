@@ -9,7 +9,7 @@ from models.api.movies import MovieReq, MovieRes
 from models.db.movies import Movie
 
 # OMDB API Configuration
-OMDB_API_KEY = os.getenv("OMDB_API_KEY", "83a26ab")
+OMDB_API_KEY = os.getenv("OMDB_API_KEY")
 OMDB_URL = "http://www.omdbapi.com/"
 
 

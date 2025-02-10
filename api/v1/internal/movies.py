@@ -14,10 +14,6 @@ router = APIRouter(
 SECRET_TOKEN = os.getenv("SECRET_TOKEN", "my_secret_token")
 security = HTTPBearer()
 
-# OMDB API Configuration
-OMDB_API_KEY = os.getenv("OMDB_API_KEY", "83a26ab")
-OMDB_URL = "http://www.omdbapi.com/"
-
 
 # Utility function to validate authorization token
 def authorize(credentials: HTTPAuthorizationCredentials = Depends(security)):
